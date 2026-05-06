@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Notes Pro | Starfield Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --bg-dark: #050505;
+            --glass-bg: rgba(15, 23, 42, 0.4);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text: #f8fafc;
+            --text-light: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+            --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.15);
+        }
+
+        * { box-sizing: border-box; }
+        
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-dark); color: var(--text); overflow: hidden;
+        }
+
+        #starfield { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+        .app-container { display: flex; height: 100vh; width: 100vw; background: transparent; }
+
+        #auth-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(12px);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .auth-box {
+            background: var(--glass-bg); padding: 40px; border-radius: 24px;
+            box-shadow: var(--shadow-glow); width: 100%; max-width: 360px; text-align: center;
+            border: 1px solid var(--glass-border); backdrop-filter: blur(20px);
+        }
+        .auth-box h2 { margin-top: 0; font-weight: 800; color: #fff; text-shadow: 0 0 10px var(--primary); }
+        .input-field {
+            width: 100%; padding: 14px 16px; margin: 10px 0; border-radius: 12px;
+            border: 1px solid var(--glass-border); background: rgba(0,0,0,0.3); color: white;
+            font-family: inherit; outline: none; transition: all 0.3s;
+        }
+        .input-field:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(139, 92, 246, 0.3); }
+
+        .sidebar {
+            width: 320px; background: var(--glass-bg); border-right: 1px solid var(--glass-border);
+            display: flex; flex-direction: column; padding: 24px 20px; z-index: 10;
+            backdrop-filter: blur(16px);
+        }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .search-bar {
+            background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 12px 16px; 
+            border-radius: 12px; margin-bottom: 20px; width: 100%; outline: none; color: white;
+        }
+        
+        .note-list { flex-grow: 1; overflow-y: auto; margin-right: -5px; padding-right: 5px; }
+        .note-item {
+            padding: 16px; border-radius: 16px; margin-bottom: 12px; cursor: pointer;
+            border: 1px solid transparent; background: rgba(255,255,255,0.03);
+            display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.2s;
+        }
+        .note-item:hover { transform: translateX(5px); background: rgba(255,255,255,0.08); border-color: var(--glass-border); }
+        .note-item.active { border-color: var(--primary); background: rgba(139, 92, 246, 0.15); box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.1); }
+        .note-item-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;}
+        .note-item-preview { font-size: 12px; color: var(--text-light); }
+        
+        .delete-btn {
+            background: transparent; border: none; color: var(--text-light); cursor: pointer;
+            padding: 6px; border-radius: 8px; opacity: 0; transition: all 0.2s;
+        }
+        .note-item:hover .delete-btn { opacity: 1; }
+        .delete-btn:hover { color: var(--danger); background: rgba(239, 68, 68, 0.2); }
+
+        .main-editor { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
+        .editor-header {
+            padding: 16px 40px; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;
+        }
+        #current-title {
+            border: none; background: transparent; font-size: 24px; font-weight: 800; 
+            color: #fff; outline: none; width: 60%; font-family: inherit; transition: 0.3s;
+        }
+        #current-title.error { border-bottom: 2px solid var(--danger); }
+        
+        .toolbar {
+            padding: 10px 40px; background: rgba(0, 0, 0, 0.4); border-bottom: 1px solid var(--glass-border);
+            display: flex; gap: 10px; align-items: center;
+        }
+        .tool-btn {
+            background: transparent; border: 1px solid var(--glass-border); color: var(--text-light);
+            padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+        }
+        .tool-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+
+        .editor-body { display: flex; flex-grow: 1; overflow: hidden; position: relative; }
+        #textarea {
+            flex: 1; padding: 30px 40px; border: none; outline: none; resize: none;
+            font-size: 16px; line-height: 1.8; background: transparent; color: #e2e8f0;
+            font-family: 'Fira Code', monospace;
+        }
+        #preview {
+            flex: 1; padding: 30px 40px; overflow-y: auto; background: rgba(0,0,0,0.4);
+            border-left: 1px solid var(--glass-border); display: none; line-height: 1.7;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-bar {
+            padding: 8px 40px; background: rgba(0,0,0,0.6); border-top: 1px solid var(--glass-border);
+            display: flex; justify-content: space-between; font-size: 12px; color: var(--text-light);
+        }
+
+        .btn {
+            padding: 10px 20px; border-radius: 12px; border: none; cursor: pointer;
+            font-weight: 600; font-family: inherit; transition: all 0.2s; font-size: 14px;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
+        .btn-primary:hover { background: var(--primary-hover); box-shadow: 0 0 25px rgba(139, 92, 246, 0.6); }
+        .btn-ghost { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+
+        .markdown-body h1, .markdown-body h2 { border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-top: 24px; color: #fff;}
+        .markdown-body pre { background: rgba(0,0,0,0.6); padding: 16px; border-radius: 12px; border: 1px solid var(--glass-border); }
+        .markdown-body code { font-family: 'Fira Code', monospace; color: #a78bfa; }
+        .markdown-body blockquote { border-left: 4px solid var(--primary); margin: 0; padding-left: 16px; color: var(--text-light); background: rgba(139, 92, 246, 0.1); padding: 10px 16px; border-radius: 0 8px 8px 0;}
+    </style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div id="auth-overlay">
+    <div class="auth-box">
+        <h2>Nova Pro</h2>
+        <p style="color: var(--text-light); font-size: 14px; margin-bottom: 24px;">登入星際節點</p>
+        <input type="text" id="user" class="input-field" placeholder="輸入帳號">
+        <input type="password" id="pass" class="input-field" placeholder="密碼 (選填)">
+        <button class="btn btn-primary" onclick="handleAuth()" style="width:100%; margin-top:16px;">啟動系統</button>
+        <p id="auth-msg" style="color: var(--danger); font-size:13px; margin-top: 16px; min-height: 20px;"></p>
+    </div>
+</div>
+
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span style="font-weight:800; font-size:1.4rem; color: #fff; text-shadow: 0 0 10px var(--primary);">✨ My Notes</span>
+            <button class="btn btn-primary" onclick="createNewNote()" style="padding: 8px 14px;">+ 新增</button>
+        </div>
+        <input type="text" class="search-bar" placeholder="🔍 搜尋星系筆記..." oninput="filterNotes(this.value)">
+        <div class="note-list" id="note-list"></div>
+        <div style="margin-top:auto; padding-top:20px; display:flex; gap:10px;">
+            <button class="btn btn-ghost" onclick="exportData()" style="flex:1;" title="備份所有資料">📦 備份</button>
+            <button class="btn btn-ghost" onclick="location.reload()" style="flex:1;">登出</button>
+        </div>
+    </aside>
+
+    <main class="main-editor">
+        <header class="editor-header">
+            <input type="text" id="current-title" placeholder="請輸入筆記標題..." oninput="handleTitleInput()" disabled>
+            <div style="display:flex; gap:12px; align-items: center;">
+                <span id="save-status" style="font-size: 13px; color: var(--text-light); margin-right: 10px;">未連線</span>
+                <button class="btn btn-ghost" id="preview-toggle" onclick="togglePreview()">👁️ 預覽</button>
+                <button class="btn btn-primary" onclick="saveContent()">💾 儲存</button>
+            </div>
+        </header>
+        
+        <div class="toolbar">
+            <button class="tool-btn" onclick="insertMarkdown('**', '**')">B 粗體</button>
+            <button class="tool-btn" onclick="insertMarkdown('*', '*')">I 斜體</button>
+            <button class="tool-btn" onclick="insertMarkdown('# ', '')">H1</button>
+            <button class="tool-btn" onclick="insertMarkdown('- ', '')">● 清單</button>
+            <button class="tool-btn" onclick="insertMarkdown('```\n', '\n
+```')">&lt;/&gt;</button>
+            <button class="tool-btn" onclick="exportToMD()" style="margin-left: auto;">⬇️ .md</button>
+        </div>
+
+        <div class="editor-body">
+            <textarea id="textarea" placeholder="在此輸入內容..." oninput="onTextareaInput()" disabled></textarea>
+            <div id="preview" class="markdown-body"></div>
+        </div>
+
+        <div class="status-bar">
+            <span id="word-count">字數: 0</span>
+            <span id="last-edit-time">最後編輯: 無</span>
+        </div>
+    </main>
+</div>
+
+<script>
+    // --- 配置你的 GAS 網址 ---
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxFHsh0dsC4JRlLKLU4wA5kYL1ZRkMvHOCKnJhCuMhcuEsulGGcTLB9zPLu-LGCzNzDLQ/exec';
+
+    /* ================= 星空背景 ================= */
+    const canvas = document.getElementById('starfield');
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    for(let i = 0; i < 200; i++) {
+        stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, radius: Math.random() * 1.5, alpha: Math.random(), velocity: Math.random() * 0.02 });
+    }
+    function animateStars() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        stars.forEach(star => {
+            star.alpha += star.velocity;
+            if(star.alpha <= 0 || star.alpha >= 1) star.velocity = -star.velocity;
+            star.y -= 0.2; if(star.y < 0) star.y = canvas.height;
+            ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`; ctx.fill();
+        });
+        requestAnimationFrame(animateStars);
+    }
+    animateStars();
+
+    /* ================= 核心邏輯 ================= */
+    let state = { user: '', activeNote: '', notes: {}, isDirty: false, saveTimeout: null };
+
+    async function handleAuth() {
+        const u = document.getElementById('user').value.trim();
+        if (!u) { document.getElementById('auth-msg').textContent = '⚠️ 請輸入帳號'; return; }
+        
+        state.user = u;
+        updateStatus('⏳ 正在同步星際雲端...', '#fff');
+        
+        try {
+            // 從雲端獲取資料
+            const response = await fetch(`${API_URL}?action=get&user=${encodeURIComponent(u)}`);
+            const result = await response.json();
+            state.notes = result.data || {};
+        } catch (e) {
+            console.error("雲端載入失敗，切換至本地模式", e);
+            const localData = localStorage.getItem(`nova_notes_${u}`);
+            if(localData) state.notes = JSON.parse(localData);
+        }
+
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('textarea').disabled = false;
+        document.getElementById('current-title').disabled = false;
+        refreshList();
+        updateStatus('✅ 連線成功');
+    }
+
+    function handleTitleInput() {
+        const titleEl = document.getElementById('current-title');
+        if(titleEl.value.trim() === '') titleEl.classList.add('error');
+        else { titleEl.classList.remove('error'); autoSave(); }
+    }
+
+    function onTextareaInput() {
+        state.isDirty = true;
+        updateStats();
+        if(state.activeNote) { updatePreview(); autoSave(); }
+    }
+
+    function autoSave() {
+        clearTimeout(state.saveTimeout);
+        state.saveTimeout = setTimeout(() => { saveContent(); }, 2000); // 延長到2秒減少API負擔
+    }
+
+    async function saveContent() {
+        const title = document.getElementById('current-title').value.trim();
+        const content = document.getElementById('textarea').value;
+        if(!title) { updateStatus('❌ 標題空白', 'var(--danger)'); return; }
+
+        updateStatus('⏳ 同步中...');
+        
+        if(state.activeNote && state.activeNote !== title) delete state.notes[state.activeNote];
+        state.notes[title] = { content: content, updatedAt: new Date().toLocaleString() };
+        state.activeNote = title;
+
+        try {
+            // 同步到 Google GAS
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors', // 重要：處理跨域
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'set', user: state.user, data: state.notes })
+            });
+            updateStatus('✅ 已同步', 'var(--success)');
+        } catch (e) {
+            updateStatus('⚠️ 本地儲存', '#eab308');
+        }
+
+        localStorage.setItem(`nova_notes_${state.user}`, JSON.stringify(state.notes));
+        state.isDirty = false;
+        refreshList();
+    }
+
+    function refreshList(filterText = '') {
+        const listEl = document.getElementById('note-list');
+        const titles = Object.keys(state.notes).filter(t => t.toLowerCase().includes(filterText.toLowerCase()));
+        titles.sort((a, b) => new Date(state.notes[b].updatedAt) - new Date(state.notes[a].updatedAt));
+        listEl.innerHTML = titles.map(title => `
+            <div class="note-item ${state.activeNote === title ? 'active' : ''}" onclick="loadNote('${title}')">
+                <div style="flex-grow:1; overflow:hidden;">
+                    <div class="note-item-title">${title}</div>
+                    <div class="note-item-preview">${state.notes[title].updatedAt}</div>
+                </div>
+                <button class="delete-btn" onclick="deleteNote(event, '${title}')">🗑️</button>
+            </div>
+        `).join('') || '<div style="text-align:center;color:var(--text-light);padding:20px;">無筆記</div>';
+    }
+
+    function loadNote(title) {
+        if(state.isDirty && !confirm("尚未儲存，確定切換？")) return;
+        state.activeNote = title;
+        document.getElementById('current-title').value = title;
+        document.getElementById('textarea').value = state.notes[title].content;
+        state.isDirty = false;
+        updatePreview();
+        updateStats();
+        refreshList();
+    }
+
+    function createNewNote() {
+        const newTitle = `新星系_${new Date().getTime().toString().slice(-4)}`;
+        state.activeNote = newTitle;
+        document.getElementById('current-title').value = newTitle;
+        document.getElementById('textarea').value = '';
+        saveContent();
+        document.getElementById('textarea').focus();
+    }
+
+    function deleteNote(event, title) {
+        event.stopPropagation();
+        if(!confirm(`確定要刪除 "${title}"？`)) return;
+        delete state.notes[title];
+        saveContent();
+    }
+
+    function insertMarkdown(prefix, suffix) {
+        const txt = document.getElementById('textarea');
+        const start = txt.selectionStart;
+        const end = txt.selectionEnd;
+        txt.value = txt.value.substring(0, start) + prefix + txt.value.substring(start, end) + suffix + txt.value.substring(end);
+        onTextareaInput();
+    }
+
+    function togglePreview() {
+        const p = document.getElementById('preview');
+        const t = document.getElementById('textarea');
+        const btn = document.getElementById('preview-toggle');
+        const isHiding = p.style.display === 'none' || p.style.display === '';
+        p.style.display = isHiding ? 'block' : 'none';
+        t.style.display = isHiding ? 'none' : 'block';
+        btn.innerHTML = isHiding ? '✏️ 編輯' : '👁️ 預覽';
+        if(isHiding) updatePreview();
+    }
+
+    function updatePreview() {
+        document.getElementById('preview').innerHTML = marked.parse(document.getElementById('textarea').value || '*空*');
+    }
+
+    function updateStatus(msg, color = 'var(--text-light)') {
+        const el = document.getElementById('save-status');
+        el.textContent = msg; el.style.color = color;
+    }
+
+    function updateStats() {
+        document.getElementById('word-count').textContent = `字數: ${document.getElementById('textarea').value.length}`;
+    }
+
+    function filterNotes(val) { refreshList(val); }
+
+    function exportToMD() {
+        const blob = new Blob([document.getElementById('textarea').value], { type: 'text/markdown' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `${state.activeNote}.md`; a.click();
+    }
+
+    function exportData() {
+        const blob = new Blob([JSON.stringify(state.notes)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `backup.json`; a.click();
+    }
+
+    window.addEventListener('beforeunload', e => { if (state.isDirty) e.returnValue = ''; });
+</script>
+</body>
+</html>
